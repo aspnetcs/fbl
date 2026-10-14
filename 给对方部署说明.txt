@@ -1,0 +1,91 @@
+============================================================
+课堂行为检测 MCP 服务 - 给对方部署说明 (对方电脑已有 Python)
+打包日期: 2026-09-04
+============================================================
+
+原作者运行环境: Python 3.11.16 (本机, conda 管理)
+对方推荐: Python 3.12 (64位, 官方有安装包, 最省心); 3.10/3.11/3.13 也能跑(用 3.12 除非你已有合适环境)
+
+你(对方)拿到的东西 = 本目录 (课堂行为检测系统/)
+  含: 服务端源码 + 主程序/GUI + 检测模型 best.pt + 中文字体 platech.ttf
+      + 依赖清单 requirements.txt + 通用启动器 启动MCP服务.bat
+  不含: Python 解释器 + torch/ultralytics/mcp 等第三方库 (zip 装不进去)
+        + 本机鉴权 token (已剥离, 见下方"安全")
+
+------------------------------------------------------------
+对方需要做的 4 步 (若还没装 Python, 先看第 0 步)
+------------------------------------------------------------
+第 0 步: 装 Python 3.12 (对方电脑还没有 Python, 或版本 < 3.10 时做)
+  1) 浏览器开 https://www.python.org/downloads/release/python-3121/
+     (或官网首页 Downloads 选 3.12 最新版)
+     下 "Windows installer (64-bit)" -> 文件名 python-3.12.x-amd64.exe
+     **注意: 一定下 .exe 安装包, 不要下源码包(.tgz / .tar.xz), 否则要自己编译源码**
+  2) 双击运行安装包:
+     **必须勾选 "Add python.exe to PATH"** (最关键一步, 不勾后面启动器找不到 python)
+     然后点 "Install Now", 一路下一步
+  3) 验证: 打开 PowerShell / 终端, 输入
+       python --version
+     应显示 Python 3.12.x ; 若显示别的版本或 "'python' 不是命令", 见下方"常见问题"
+  (用 conda 也行: conda create -n yolo python=3.12 && conda activate yolo)
+
+步骤 1: 装依赖 (只需一次, 需联网)
+  1) 打开本目录, 按住 Shift 右键空白处 -> "在此处打开终端(PowerShell)"
+  2) 建议建个干净环境(可选但推荐):
+       python -m venv .venv
+       Set-ExecutionPolicy -Scope Process RemoteSigned
+       .\.venv\Scripts\Activate.ps1
+     (Windows 默认禁止运行 .ps1, 上面那行临时放行"当前进程", 不改系统策略)
+  3) 装依赖:
+       pip install -r requirements.txt
+     -- 注意: torch 默认装 CPU 版(能跑, 慢些)。
+        要 GPU 加速(需 NVIDIA 显卡+CUDA12.1): 见 requirements.txt 顶部说明,
+        改用 cu132 的 extra-index-url 安装 torch。
+     -- PyQt5 较大, 装的时候耐心等。
+
+步骤 2: 启动服务 (双击即可, 不用改任何路径)
+  双击 启动MCP服务.bat
+  - 自动用本目录作为项目根 (MCP_PROJECT_DIR 留空即兜底)
+  - 首次加载模型约 10-30 秒, 别急
+
+步骤 3: 验证
+  浏览器打开:  http://127.0.0.1:9800/healthz
+  看到 {"status":"ok",...} 即成功。
+  局域网其他机器访问: 把 127.0.0.1 换成你这台机器的局域网 IP
+  (cmd 里 ipconfig 查 IPv4), 并放行防火墙 9800 端口入站。
+
+步骤 4: (可选) 设鉴权 token
+  默认是"免鉴权调试模式"(仅本机用安全)。
+  要给别人连或上公网, 复制 .env.example 为 scripts\\.env,
+  随便填一个随机字符串到 MCP_AUTH_TOKEN, 重启服务即可。
+  客户端连时 Header 带:  Authorization: Bearer <你设的token>
+
+------------------------------------------------------------
+安全提醒
+------------------------------------------------------------
+- 本包已**剥离原作者的 MCP_AUTH_TOKEN**, 不含任何密钥, 可放心转发。
+- 原作者机器上的 .env(token) 与你无关, 你用的是自己的 token(或免鉴权)。
+- 上公网前务必设 token + 配隧道(cloudflared/ngrok), 否则裸端口暴露有风险。
+
+------------------------------------------------------------
+常见问题
+------------------------------------------------------------
+Q: 启动报 "No module named mcp" / "No module named uvicorn"
+A: 没装依赖。回到步骤 1 跑 pip install -r requirements.txt。
+   (若用了 venv, 必须先 Activate.ps1 再启动)
+
+Q: 启动报 "No module named PyQt5"
+A: PyQt5 是服务端 import 链硬依赖(不可省), 装 requrements.txt 即可。
+
+Q: 标注图中文变方框
+A: 字体 platech.ttf 没带到位。确认 Font/platech.ttf 在解压目录里。
+
+Q: 想换解压路径
+A: 不用改任何东西。启动MCP服务.bat 用 %~dp0 自动定位, 放哪都能跑。
+
+Q: 对方是 Linux / macOS?
+A: 本启动器(.bat)是 Windows 专用。Linux/macOS 改用命令:
+   cd 项目目录
+   export MCP_PROJECT_DIR=$(pwd)
+   python -m uvicorn scripts.mcp_server:app --host 0.0.0.0 --port 9800
+   (PyQt5 在 Linux 需系统 Qt 库: apt install python3-pyqt5 或pip装headless版)
+============================================================
